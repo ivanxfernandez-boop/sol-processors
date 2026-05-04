@@ -540,9 +540,24 @@ function processFile() {
  }
  }
  if (tripType === 'Incoming') {
-  const prefTime = extractPrefPickup(notes);
-  if (prefTime && earliestI !== undefined && !r[earliestI]) {
-   r[earliestI] = formatTimeIntoCell(apptVal, prefTime);
+  // Calculate pickup time based on dropoff address
+  // 2hrs before appt if going to LBVA (5901), 1h30 otherwise
+  if (apptVal && earliestI !== undefined) {
+   const apptStr = String(apptVal);
+   const timeMatch = apptStr.match(/(\d+):(\d+):(\d+)/);
+   const tzMatch = apptStr.match(/([+-]\d{4})$/);
+   const dayMatch = apptStr.match(/^(\w+, \d+ \w+ \d+)/);
+   if (timeMatch && tzMatch && dayMatch) {
+    let totalMins = parseInt(timeMatch[1]) * 60 + parseInt(timeMatch[2]);
+    const doAddr = idx['Dropoff Address'] !== undefined ? r[idx['Dropoff Address']] : null;
+    const isLBVA = doAddr && String(doAddr).includes('5901');
+    totalMins -= isLBVA ? 120 : 90;
+    if (totalMins < 0) totalMins += 1440;
+    const hh = String(Math.floor(totalMins / 60)).padStart(2, '0');
+    const mm = String(totalMins % 60).padStart(2, '0');
+    r[earliestI] = dayMatch[1] + ' ' + hh + ':' + mm + ':00 ' + tzMatch[1];
+    r[apptI] = null;
+   }
   }
  }
  const outRow = OUT_COLS.map(col => {
