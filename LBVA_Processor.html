@@ -540,8 +540,6 @@ function processFile() {
  }
  }
  if (tripType === 'Incoming') {
-  // Calculate pickup time based on dropoff address
-  // 2hrs before appt if going to LBVA (5901), 1h30 otherwise
   if (apptVal && earliestI !== undefined) {
    const apptStr = String(apptVal);
    const timeMatch = apptStr.match(/(\d+):(\d+):(\d+)/);
@@ -550,12 +548,26 @@ function processFile() {
    if (timeMatch && tzMatch && dayMatch) {
     let totalMins = parseInt(timeMatch[1]) * 60 + parseInt(timeMatch[2]);
     const doAddr = idx['Dropoff Address'] !== undefined ? r[idx['Dropoff Address']] : null;
+    const distI = idx['Estimated Distance (miles)'];
+    const distVal = distI !== undefined ? parseFloat(r[distI]) : NaN;
     const isLBVA = doAddr && String(doAddr).includes('5901');
-    totalMins -= isLBVA ? 120 : 90;
+    let offset;
+    if (!isNaN(distVal) && distVal > 50) offset = 240;
+    else if (!isNaN(distVal) && distVal > 30) offset = 180;
+    else if (!isNaN(distVal) && distVal < 5.3 && !isLBVA) offset = 60;
+    else if (isLBVA) offset = 120;
+    else offset = 90;
+    totalMins -= offset;
     if (totalMins < 0) totalMins += 1440;
     const hh = String(Math.floor(totalMins / 60)).padStart(2, '0');
     const mm = String(totalMins % 60).padStart(2, '0');
     r[earliestI] = dayMatch[1] + ' ' + hh + ':' + mm + ':00 ' + tzMatch[1];
+    // Append original appt time to notes
+    const apptTimeOnly = timeMatch[1].padStart(2, '0') + ':' + timeMatch[2];
+    if (notesI !== undefined) {
+     const existing = r[notesI] ? String(r[notesI]).trim() : '';
+     r[notesI] = existing ? existing + ' | Appt: ' + apptTimeOnly : 'Appt: ' + apptTimeOnly;
+    }
     r[apptI] = null;
    }
   }
